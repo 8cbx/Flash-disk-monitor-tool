@@ -15,9 +15,21 @@ void currentwd()
         perror("getcwd");
         exit(EXIT_FAILURE);
     }
-    printf("%s\n",cwd);
+    //printf("%s\n",cwd);
 }
-void changewd(char *twd)
+
+void notify(char *pw,int fd)
+{
+    int wd;
+    wd=inotify_add_watch(fd,pw,IN_ALL_EVENTS);
+    if(wd==-1)
+    {
+        perror("inotify_add_watch");
+        exit(EXIT_FAILURE);
+    }
+}
+
+void changewd(char *twd,int fd)
 {
     struct dirent *entry;
     DIR *dir;
@@ -26,16 +38,17 @@ void changewd(char *twd)
     errno=0;
     dir=opendir(twd);
     {
-        if(errno != 0)
+        if(errno!=0)
         {
             perror("opendir");
             exit(EXIT_FAILURE);
         }
     }
+    notify(twd,fd);
     errno=0;
     while((entry=readdir(dir))!=NULL)
     {
-        if(strcmp(".",entry->d_name) == 0 ||strcmp("..",entry->d_name) == 0)
+        if(strcmp(".",entry->d_name)==0||strcmp("..",entry->d_name)==0)
             continue;
         else if(entry->d_type==4)
         {
@@ -45,12 +58,28 @@ void changewd(char *twd)
             strcpy(nextwd,twd);
             strcat(nextwd,"/\0");
             strcat(nextwd,entry->d_name);
-            changewd(nextwd);
+            changewd(nextwd,fd);
             //closedir(dir);
         }
-        if(entry->d_type==8)printf("%s/%s\n",twd,entry->d_name);
+        //if(entry->d_type==8)printf("%s/%s\n",twd,entry->d_name);
     }
     closedir(dir);
+}
+
+void readnoti(int fd)
+{
+    char buf[1024]__attribute__((aligned(4)));
+    ssize_t len,i=0,j;
+    len=read(fd,buf,1024);
+    while(i<len)
+    {
+        struct inotify_event *event = (struct inotify_event *) &buf[i];
+        if(event->len)
+        {
+            printf("%s %d\n",event->name,event->mask);
+        }
+        i+=sizeof(struct inotify_event)+event->len;
+    }
 }
 int main()
 {
@@ -63,6 +92,8 @@ int main()
         exit(EXIT_FAILURE);
     }
     currentwd();
-    changewd(path);
+    changewd(path,fd);
+    while(1)
+        readnoti(fd);
     return 0;
 }
