@@ -83,7 +83,7 @@ void readnoti(int fd)
 }
 int main()
 {
-    char path[1024]= {"/home/chu/local"};
+    char path[1024]= {"/"};
     int fd;
     fd=inotify_init1(0);
     if(fd==-1)
